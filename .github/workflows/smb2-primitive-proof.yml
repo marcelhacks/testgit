@@ -29,7 +29,7 @@ jobs:
           net user $user $password /add
           if ($LASTEXITCODE -ne 0) { throw "failed to create temporary SMB user" }
           Start-Service LanmanServer
-          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /out:proof/PidPipeServer.exe proof/PidPipeServer.cs
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo "/out:proof\PidPipeServer.exe" "proof\PidPipeServer.cs"
           if ($LASTEXITCODE -ne 0) { throw "C# proof server compilation failed" }
           $claimedPid = $PID
           $server = Start-Process proof/PidPipeServer.exe -PassThru -RedirectStandardOutput proof/pid-server.log -RedirectStandardError proof/pid-server.err
