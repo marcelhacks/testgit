@@ -25,7 +25,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $user = "pidproof"
-          $password = "PidProof-2026-Temporary!"
+          $password = "PidPrf26!X9z"
           net user $user $password /add
           if ($LASTEXITCODE -ne 0) { throw "failed to create temporary SMB user" }
           Start-Service LanmanServer
